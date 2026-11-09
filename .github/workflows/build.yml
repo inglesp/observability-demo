@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      # actions/checkout v4.2.2. Check this SHA against the release before relying on it.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: bash scripts/check.sh
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [loki, alloy, grafana]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build and push
+        env:
+          IMAGE_DIR: ${{ matrix.image }}
+          OWNER: ${{ github.repository_owner }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${OWNER,,}/observability-$IMAGE_DIR"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            -t "$image:latest" -t "$image:sha-$GITHUB_SHA" \
+            "$IMAGE_DIR"
+          docker push "$image:sha-$GITHUB_SHA"
+          docker push "$image:latest"

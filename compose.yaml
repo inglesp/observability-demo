@@ -1,0 +1,47 @@
+# Local stack for developing the images and dashboards.
+# Run `just gen-test-certs` first, then `just up`.
+
+services:
+  loki:
+    build: loki
+    volumes:
+      - loki-data:/data
+
+  alloy:
+    build: alloy
+    environment:
+      LOKI_PUSH_URL: http://loki:8000/loki/api/v1/push
+    volumes:
+      - alloy-data:/data
+      - ./dev/certs/server:/etc/alloy/tls:ro
+    ports:
+      - "127.0.0.1:6514:6514"
+      - "127.0.0.1:8001:8000" # Alloy UI
+    depends_on:
+      - loki
+
+  grafana:
+    build: grafana
+    environment:
+      LOKI_URL: http://loki:8000
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_COOKIE_SECURE: "false"
+    volumes:
+      - grafana-data:/data
+    ports:
+      - "127.0.0.1:3000:8000"
+    depends_on:
+      - loki
+
+  sender:
+    build: dev/sender
+    hostname: dev-sender
+    volumes:
+      - ./dev/certs/client:/etc/rsyslog.d/tls:ro
+    depends_on:
+      - alloy
+
+volumes:
+  loki-data:
+  alloy-data:
+  grafana-data:

@@ -1,0 +1,93 @@
+// Receives syslog from the fleet over mutual TLS and pushes it to Loki.
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// RFC 5424, octet-counted framing, over TLS.
+// Setting ca_file makes the listener require a client certificate signed by
+// that CA, so only droplets holding a cert from our CA can send.
+loki.source.syslog "fleet" {
+  listener {
+    address                = "0.0.0.0:6514"
+    protocol               = "tcp"
+    use_incoming_timestamp = true
+    labels                 = { job = "syslog" }
+
+    tls_config {
+      cert_file = "/etc/alloy/tls/server.crt"
+      key_file  = "/etc/alloy/tls/server.key"
+      ca_file   = "/etc/alloy/tls/ca.crt"
+    }
+  }
+
+  relabel_rules = loki.relabel.fleet.rules
+  forward_to    = [loki.process.fleet.receiver]
+}
+
+loki.relabel "fleet" {
+  forward_to = []
+
+  // Self-asserted by the sender.
+  rule {
+    source_labels = ["__syslog_message_hostname"]
+    target_label  = "host"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_app_name"]
+    target_label  = "app_name"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_severity"]
+    target_label  = "level"
+  }
+
+  // The IP the connection actually came from. With the firewall and mTLS this
+  // can't be forged, so it can be checked against the self-asserted host.
+  rule {
+    source_labels = ["__syslog_connection_ip_address"]
+    target_label  = "source_ip"
+  }
+}
+
+// Promote a few low-cardinality fields to labels, so dashboards can offer
+// them as variables.
+loki.process "fleet" {
+  // event=deploy app=<app> image=<image> digest=<digest> result=success|failure duration_s=<n>
+  stage.match {
+    selector = `{app_name="deploy-event"}`
+
+    stage.logfmt {
+      mapping = { app = "", result = "" }
+    }
+
+    stage.labels {
+      values = { app = "", result = "" }
+    }
+  }
+
+  // One JSON object per request, in nginx's bytes_json log format.
+  stage.match {
+    selector = `{app_name="nginx-access"}`
+
+    stage.json {
+      expressions = { vhost = "" }
+    }
+
+    stage.labels {
+      values = { vhost = "" }
+    }
+  }
+
+  forward_to = [loki.write.loki.receiver]
+}
+
+loki.write "loki" {
+  endpoint {
+    // loki.web is Loki's alias on the shared Dokku network.
+    url = coalesce(sys.env("LOKI_PUSH_URL"), "http://loki.web:8000/loki/api/v1/push")
+  }
+}

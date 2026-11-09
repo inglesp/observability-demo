@@ -1,0 +1,270 @@
+{
+  "uid": "deploys",
+  "title": "Deploys",
+  "description": "Deploys across the fleet, from the deploy service's deploy-event log lines.",
+  "tags": ["deploys"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "time": { "from": "now-7d", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Droplet",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values({app_name=\"deploy-event\"}, host)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      },
+      {
+        "name": "app",
+        "label": "App",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values({app_name=\"deploy-event\", host=~\"$host\"}, app)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Successful deploys",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app_name=\"deploy-event\", host=~\"$host\", app=~\"$app\", result=\"success\"} [$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Failed deploys",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app_name=\"deploy-event\", host=~\"$host\", app=~\"$app\", result=\"failure\"} [$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed deploy runs",
+      "description": "Runs of deploy.service that systemd reported as failed. These include failures outside a single app's deploy, such as ansible-pull.",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app_name=\"systemd\", host=~\"$host\"} |= \"deploy.service: Failed with result\" [$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Hosts reporting from an unexpected IP",
+      "description": "Number of hostnames that have sent from more than one source IP in the range. Hostnames are self-asserted by senders; source IPs aren't.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "count(count by (host) (count by (host, source_ip) (count_over_time({job=\"syslog\"} [$__range]))) > 1)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Deploys over time",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "1m",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "sum by (result) (count_over_time({app_name=\"deploy-event\", host=~\"$host\", app=~\"$app\"} [$__interval]))",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": { "mode": "normal", "group": "A" }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "success" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failure" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Recent deploys",
+      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "{app_name=\"deploy-event\", host=~\"$host\", app=~\"$app\"} | logfmt | line_format \"{{ .result | upper }}  {{ .host }}  {{ .app }}  {{ .image }}@{{ .digest }}  ({{ .duration_s }}s)\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Failed deploy runs (systemd)",
+      "gridPos": { "x": 0, "y": 23, "w": 24, "h": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "{app_name=\"systemd\", host=~\"$host\"} |= \"deploy.service: Failed with result\" | line_format \"{{ .host }}  {{ __line__ }}\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": false,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    }
+  ]
+}

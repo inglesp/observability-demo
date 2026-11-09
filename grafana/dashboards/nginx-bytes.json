@@ -1,0 +1,239 @@
+{
+  "uid": "nginx-bytes",
+  "title": "nginx bytes",
+  "description": "Bytes flowing through Dokku's nginx on one droplet, from its bytes_json access logs.",
+  "tags": ["nginx"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "Droplet",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values({app_name=\"nginx-access\"}, host)",
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "sort": 1
+      },
+      {
+        "name": "vhost",
+        "label": "Site",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values({app_name=\"nginx-access\", host=\"$host\"}, vhost)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Bytes out",
+      "description": "Total bytes sent to clients (nginx $bytes_sent) in the range.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json bytes_sent=\"bytes_sent\" | unwrap bytes_sent | __error__=\"\" [$__range]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decbytes", "noValue": "0" }, "overrides": [] },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Bytes in",
+      "description": "Total bytes received from clients (nginx $request_length) in the range.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json request_length=\"request_length\" | unwrap request_length | __error__=\"\" [$__range]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decbytes", "noValue": "0" }, "overrides": [] },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Requests",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "sum(count_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} [$__range]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "noValue": "0" }, "overrides": [] },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Mean bytes out per request",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "avg(avg_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json bytes_sent=\"bytes_sent\" | unwrap bytes_sent | __error__=\"\" [$__range]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decbytes", "noValue": "0" }, "overrides": [] },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Bytes out per second, by site",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "1m",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "sum by (vhost) (sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json bytes_sent=\"bytes_sent\" | unwrap bytes_sent | __error__=\"\" [$__interval])) / ($__interval_ms / 1000)",
+          "legendFormat": "{{vhost}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Bytes in per second, by site",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "1m",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "sum by (vhost) (sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json request_length=\"request_length\" | unwrap request_length | __error__=\"\" [$__interval])) / ($__interval_ms / 1000)",
+          "legendFormat": "{{vhost}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Top sites by bytes out",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "instant",
+          "expr": "topk(10, sum by (vhost) (sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json bytes_sent=\"bytes_sent\" | unwrap bytes_sent | __error__=\"\" [$__range])))",
+          "legendFormat": "{{vhost}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decbytes", "min": 0 }, "overrides": [] },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Bytes out per second, by status",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "interval": "1m",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "queryType": "range",
+          "expr": "sum by (status) (sum_over_time({app_name=\"nginx-access\", host=\"$host\", vhost=~\"$vhost\"} | json status=\"status\", bytes_sent=\"bytes_sent\" | unwrap bytes_sent | __error__=\"\" [$__interval])) / ($__interval_ms / 1000)",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ]
+}
