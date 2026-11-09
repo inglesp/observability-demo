@@ -56,7 +56,7 @@ reset:
 
 # Send sample deploy events and nginx access logs from the test sender
 send-test-logs:
-    docker compose exec sender send-test-logs
+    docker compose exec -T sender bash -s < dev/sender/send-test-logs.sh
 
 # Check that Alloy accepts the CA-signed client cert, and rejects no cert and a rogue cert
 check-mtls:

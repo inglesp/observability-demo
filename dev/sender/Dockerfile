@@ -9,6 +9,5 @@ RUN apt-get update \
  && mkdir -p /var/spool/rsyslog /var/log/nginx
 
 COPY 90-forward.conf /etc/rsyslog.d/90-forward.conf
-COPY --chmod=755 send-test-logs.sh /usr/local/bin/send-test-logs
 
 CMD ["rsyslogd", "-n", "-iNONE"]
