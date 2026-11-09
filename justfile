@@ -5,6 +5,12 @@ default:
 check:
     bash scripts/check.sh
 
+# Format alloy/config.alloy in place with `alloy fmt`, as `just check` expects
+fmt:
+    docker build -q -t observability-alloy:check alloy > /dev/null
+    docker run --rm -i --entrypoint /bin/alloy observability-alloy:check fmt - < alloy/config.alloy > alloy/config.alloy.tmp
+    mv alloy/config.alloy.tmp alloy/config.alloy
+
 # Generate a throwaway CA, server cert and client certs for the local stack
 gen-test-certs:
     #!/usr/bin/env bash
